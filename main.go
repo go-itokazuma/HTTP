@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"text/template"
 
 	_ "github.com/lib/pq"
@@ -54,7 +55,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	t, err := template.New("foo").Parse(`{{define "T"}}<html><body>Hello, {{.}}!</body></html>{{end}}`)
+	t, err := template.New("foo").Parse(`{{define "T"}}<html><body>Hello, {{.}}!</body></html>{{end}}{{define "Cafe"}}<html><body>Cafe ID: {{.}}</body></html>{{end}}`)
 	if err != nil {
 		log.Fatalf("parsing template: %s", err)
 	}
@@ -69,6 +70,9 @@ func main() {
 	})
 
 	list, err := template.New("foo").Parse(`{{define "List"}}<html><body>カフェリスト:<ul>{{range .}}<li>{{.ID}}: {{.Name}}</li>{{end}}</ul></body></html>{{end}}`)
+	if err != nil {
+		log.Fatalf("parsing template: %s", err)
+	}
 	http.HandleFunc("GET /cafes", func(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query("SELECT id, name FROM cafes")
 		if err != nil {
@@ -94,10 +98,35 @@ func main() {
 
 	})
 
+	cafe, err := template.New("foo").Parse(`{{define "Cafe"}}<html><body>{{.ID}}: {{.Name}}</body></html>{{end}}`)
+	if err != nil {
+		log.Fatalf("parsing template: %s", err)
+	}
+
 	http.HandleFunc("GET /cafes/{id}", func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid ID", http.StatusBadRequest)
+			return
+		}
+
+		var c Cafes
+		err = db.QueryRow("SELECT id, name FROM cafes WHERE id = $1", id).Scan(&c.ID, &c.Name)
+		if err != nil {
+			http.Error(w, "Cafe not found", http.StatusNotFound)
+			return
+		}
+
+		//fmt.Fprintf(w, "User ID: %d\n", id)
+
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-		err = t.ExecuteTemplate(w, "T", "World")
+		err = cafe.ExecuteTemplate(w, "Cafe", c)
+		if err != nil {
+			http.Error(w, "Template execution error", http.StatusInternalServerError)
+			return
+		}
 	})
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
