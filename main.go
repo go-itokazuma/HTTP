@@ -69,7 +69,7 @@ func main() {
 
 	})
 
-	list, err := template.New("foo").Parse(`{{define "List"}}<html><body>カフェリスト:<ul>{{range .}}<li>{{.ID}}: {{.Name}}</li>{{end}}</ul></body></html>{{end}}`)
+	list, err := template.New("foo").Parse(`{{define "List"}}<html><body>カフェリスト:<ul>{{range .}}<li><a href="/cafes/{{.ID}}">{{.ID}}: {{.Name}}</a></li>{{end}}</ul></body></html>{{end}}`)
 	if err != nil {
 		log.Fatalf("parsing template: %s", err)
 	}
@@ -98,7 +98,7 @@ func main() {
 
 	})
 
-	cafe, err := template.New("foo").Parse(`{{define "Cafe"}}<html><body>{{.ID}}: {{.Name}}</body></html>{{end}}`)
+	cafe, err := template.New("foo").Parse(`{{define "Cafe"}}<html><body>{{.ID}}: {{.Name}}<p><a href="/cafes">一覧に戻る</a></p></body></html>{{end}}`)
 	if err != nil {
 		log.Fatalf("parsing template: %s", err)
 	}
