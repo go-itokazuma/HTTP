@@ -26,8 +26,8 @@ func methodOverrideMiddleware(next http.Handler) http.Handler {
 		if r.Method == http.MethodPost {
 			if err := r.ParseForm(); err == nil {
 				override := strings.ToUpper((r.Form.Get("_method")))
-				if override == http.MethodPut {
-					r.Method = http.MethodPut
+				if override == http.MethodPut || override == http.MethodDelete {
+					r.Method = override
 				}
 			}
 		}
@@ -217,6 +217,11 @@ func main() {
 			<p>営業時間: <input type="text" name="open" value="{{.Open}}"></p>
 			<p><input type="submit" value="更新"></p>
 		</form>
+
+		<form action="/cafes/{{.ID}}" method="post">
+			<input type="hidden" name="_method" value="DELETE">
+			<p><input type="submit" value="削除"></p>
+		</form>
 		<p><a href="/cafes">一覧に戻る</a></p>
 	</body></html>
 	{{end}}`)
@@ -265,6 +270,22 @@ func main() {
 			return
 		}
 		http.Redirect(w, r, fmt.Sprintf("/cafes/%d", id), http.StatusSeeOther)
+	})
+
+	mux.HandleFunc("DELETE /cafes/{id}", func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid ID", http.StatusBadRequest)
+			return
+		}
+
+		_, err = db.Exec("DELETE FROM cafes WHERE id = $1", id)
+		if err != nil {
+			http.Error(w, "Database delete error", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/cafes", http.StatusSeeOther)
 	})
 
 	log.Fatal(http.ListenAndServe(":8080", methodOverrideMiddleware(mux)))
