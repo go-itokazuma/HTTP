@@ -19,8 +19,6 @@ type Cafes struct {
 	Open    string
 }
 
-var Db *sql.DB
-
 func methodOverrideMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
@@ -36,33 +34,28 @@ func methodOverrideMiddleware(next http.Handler) http.Handler {
 }
 
 func loadTemplates() map[string]*template.Template {
-	list, err := template.New("foo").ParseFiles("templates/list.html.tmpl")
-	if err != nil {
-		log.Fatalf("parsing template: %s", err)
+	files := map[string]string{
+		"List":   "templates/list/list.html.tmpl",
+		"Detail": "templates/detail/detail.html.tmpl",
+		"New":    "templates/new/new.html.tmpl",
+		"Edit":   "templates/edit/edit.html.tmpl",
 	}
 
-	detail, err := template.New("foo").ParseFiles("templates/detail/detail.html.tmpl")
-	if err != nil {
-		log.Fatalf("parsing template: %s", err)
+	templates := make(map[string]*template.Template)
+	for name, path := range files {
+		templates[name] = template.Must(template.ParseFiles(path))
 	}
-
-	new, err := template.New("foo").ParseFiles("templates/new.html.tmpl")
-	if err != nil {
-		log.Fatalf("parsing template: %s", err)
-	}
-
-	edit, err := template.New("foo").ParseFiles("templates/edit.html.tmpl")
-	if err != nil {
-		log.Fatalf("parsing template: %s", err)
-	}
-
-	return map[string]*template.Template{
-		"list":   list,
-		"detail": detail,
-		"new":    new,
-		"edit":   edit,
-	}
+	return templates
 }
+
+func getTemplate(templates map[string]*template.Template, name string) (*template.Template, error) {
+	tmpl, ok := templates[name]
+	if !ok {
+		return nil, fmt.Errorf("template %s not found", name)
+	}
+	return tmpl, nil
+}
+
 func main() {
 	mux := http.NewServeMux()
 
@@ -71,7 +64,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	Db = db
 	defer db.Close()
 
 	templates := loadTemplates()
@@ -79,7 +71,8 @@ func main() {
 	mux.HandleFunc("GET /cafes", func(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query("SELECT id, name FROM cafes ORDER BY id")
 		if err != nil {
-			log.Fatal(err)
+			http.Error(w, "Database query error", http.StatusInternalServerError)
+			return
 		}
 		defer rows.Close() // 必ずCloseする
 
@@ -90,15 +83,24 @@ func main() {
 
 			err := rows.Scan(&id, &name)
 			if err != nil {
-				log.Fatal(err)
+				http.Error(w, "Database query error", http.StatusInternalServerError)
+				return
 			}
 			cafeList = append(cafeList, Cafes{ID: id, Name: name})
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-		err = templates["list"].ExecuteTemplate(w, "List", cafeList)
-
+		tmpl, err := getTemplate(templates, "List")
+		if err != nil {
+			http.Error(w, "Template not found", http.StatusInternalServerError)
+			return
+		}
+		err = tmpl.ExecuteTemplate(w, "List", cafeList)
+		if err != nil {
+			http.Error(w, "Template execution error", http.StatusInternalServerError)
+			return
+		}
 	})
 
 	mux.HandleFunc("GET /cafes/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -116,11 +118,14 @@ func main() {
 			return
 		}
 
-		//fmt.Fprintf(w, "User ID: %d\n", id)
-
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-		err = templates["detail"].ExecuteTemplate(w, "Detail", c)
+		tmpl, err := getTemplate(templates, "Detail")
+		if err != nil {
+			http.Error(w, "Template not found", http.StatusInternalServerError)
+			return
+		}
+		err = tmpl.ExecuteTemplate(w, "Detail", c)
 		if err != nil {
 			http.Error(w, "Template execution error", http.StatusInternalServerError)
 			return
@@ -129,7 +134,12 @@ func main() {
 
 	mux.HandleFunc("GET /cafes/new", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		err = templates["new"].ExecuteTemplate(w, "New", nil)
+		tmpl, err := getTemplate(templates, "New")
+		if err != nil {
+			http.Error(w, "Template not found", http.StatusInternalServerError)
+			return
+		}
+		err = tmpl.ExecuteTemplate(w, "New", nil)
 		if err != nil {
 			http.Error(w, "Template execution error", http.StatusInternalServerError)
 			return
@@ -166,7 +176,12 @@ func main() {
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		err = templates["edit"].ExecuteTemplate(w, "Edit", c)
+		tmpl, err := getTemplate(templates, "Edit")
+		if err != nil {
+			http.Error(w, "Template not found", http.StatusInternalServerError)
+			return
+		}
+		err = tmpl.ExecuteTemplate(w, "Edit", c)
 		if err != nil {
 			http.Error(w, "Template execution error", http.StatusInternalServerError)
 			return
