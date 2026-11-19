@@ -1,0 +1,18 @@
+{{define "Edit"}}
+	<html><body>
+		<h1>カフェを編集</h1>
+		<form action="/cafes/{{.ID}}" method="post">
+			<input type="hidden" name="_method" value="PUT">
+			<p>店舗名: <input type="text" name="name" value="{{.Name}}"></p>
+			<p>住所: <input type="text" name="address" value="{{.Address}}"></p>
+			<p>営業時間: <input type="text" name="open" value="{{.Open}}"></p>
+			<p><input type="submit" value="更新"></p>
+		</form>
+
+		<form action="/cafes/{{.ID}}" method="post">
+			<input type="hidden" name="_method" value="DELETE">
+			<p><input type="submit" value="削除"></p>
+		</form>
+		<p><a href="/cafes">一覧に戻る</a></p>
+	</body></html>
+{{end}}
