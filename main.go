@@ -56,19 +56,69 @@ func getTemplate(templates map[string]*template.Template, name string) (*templat
 	return tmpl, nil
 }
 
-func main() {
-	mux := http.NewServeMux()
-
-	dsn := "user=kazuma.ito dbname=cafe sslmode=disable"
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		log.Fatal(err)
+func handleNewCafe(templates map[string]*template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		tmpl, err := getTemplate(templates, "New")
+		if err != nil {
+			http.Error(w, "Template not found", http.StatusInternalServerError)
+			return
+		}
+		err = tmpl.ExecuteTemplate(w, "New", nil)
+		if err != nil {
+			http.Error(w, "Template execution error", http.StatusInternalServerError)
+			return
+		}
 	}
-	defer db.Close()
+}
 
-	templates := loadTemplates()
+func handleCreateCafe(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.FormValue("name")
+		address := r.FormValue("address")
+		open := r.FormValue("open")
 
-	mux.HandleFunc("GET /cafes", func(w http.ResponseWriter, r *http.Request) {
+		_, err := db.Exec("INSERT INTO cafes (name, address, open) VALUES ($1, $2, $3)", name, address, open)
+		if err != nil {
+			http.Error(w, "Database insert error", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/cafes", http.StatusSeeOther)
+	}
+}
+
+func handleEditCafe(templates map[string]*template.Template, db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid ID", http.StatusBadRequest)
+			return
+		}
+
+		var c Cafes
+		err = db.QueryRow("SELECT id, name, address, open FROM cafes WHERE id = $1", id).Scan(&c.ID, &c.Name, &c.Address, &c.Open)
+		if err != nil {
+			http.Error(w, "Cafe not found", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		tmpl, err := getTemplate(templates, "Edit")
+		if err != nil {
+			http.Error(w, "Template not found", http.StatusInternalServerError)
+			return
+		}
+		err = tmpl.ExecuteTemplate(w, "Edit", c)
+		if err != nil {
+			http.Error(w, "Template execution error", http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func handleListCafes(templates map[string]*template.Template, db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query("SELECT id, name FROM cafes ORDER BY id")
 		if err != nil {
 			http.Error(w, "Database query error", http.StatusInternalServerError)
@@ -101,9 +151,11 @@ func main() {
 			http.Error(w, "Template execution error", http.StatusInternalServerError)
 			return
 		}
-	})
+	}
+}
 
-	mux.HandleFunc("GET /cafes/{id}", func(w http.ResponseWriter, r *http.Request) {
+func handleDetailCafe(templates map[string]*template.Template, db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
@@ -130,65 +182,11 @@ func main() {
 			http.Error(w, "Template execution error", http.StatusInternalServerError)
 			return
 		}
-	})
+	}
+}
 
-	mux.HandleFunc("GET /cafes/new", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		tmpl, err := getTemplate(templates, "New")
-		if err != nil {
-			http.Error(w, "Template not found", http.StatusInternalServerError)
-			return
-		}
-		err = tmpl.ExecuteTemplate(w, "New", nil)
-		if err != nil {
-			http.Error(w, "Template execution error", http.StatusInternalServerError)
-			return
-		}
-	})
-
-	mux.HandleFunc("POST /cafes", func(w http.ResponseWriter, r *http.Request) {
-
-		name := r.FormValue("name")
-		address := r.FormValue("address")
-		open := r.FormValue("open")
-
-		_, err := db.Exec("INSERT INTO cafes (name, address, open) VALUES ($1, $2, $3)", name, address, open)
-		if err != nil {
-			http.Error(w, "Database insert error", http.StatusInternalServerError)
-			return
-		}
-		http.Redirect(w, r, "/cafes", http.StatusSeeOther)
-	})
-
-	mux.HandleFunc("GET /cafes/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
-		idStr := r.PathValue("id")
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			http.Error(w, "Invalid ID", http.StatusBadRequest)
-			return
-		}
-
-		var c Cafes
-		err = db.QueryRow("SELECT id, name, address, open FROM cafes WHERE id = $1", id).Scan(&c.ID, &c.Name, &c.Address, &c.Open)
-		if err != nil {
-			http.Error(w, "Cafe not found", http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		tmpl, err := getTemplate(templates, "Edit")
-		if err != nil {
-			http.Error(w, "Template not found", http.StatusInternalServerError)
-			return
-		}
-		err = tmpl.ExecuteTemplate(w, "Edit", c)
-		if err != nil {
-			http.Error(w, "Template execution error", http.StatusInternalServerError)
-			return
-		}
-	})
-
-	mux.HandleFunc("PUT /cafes/{id}", func(w http.ResponseWriter, r *http.Request) {
+func handleUpdateCafe(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
@@ -206,9 +204,11 @@ func main() {
 			return
 		}
 		http.Redirect(w, r, fmt.Sprintf("/cafes/%d", id), http.StatusSeeOther)
-	})
+	}
+}
 
-	mux.HandleFunc("DELETE /cafes/{id}", func(w http.ResponseWriter, r *http.Request) {
+func handleDeleteCafe(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
@@ -222,7 +222,28 @@ func main() {
 			return
 		}
 		http.Redirect(w, r, "/cafes", http.StatusSeeOther)
-	})
+	}
+}
+
+func main() {
+	mux := http.NewServeMux()
+
+	dsn := "user=kazuma.ito dbname=cafe sslmode=disable"
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	templates := loadTemplates()
+
+	mux.HandleFunc("GET /cafes", handleListCafes(templates, db))
+	mux.HandleFunc("GET /cafes/{id}", handleDetailCafe(templates, db))
+	mux.HandleFunc("GET /cafes/new", handleNewCafe(templates))
+	mux.HandleFunc("POST /cafes", handleCreateCafe(db))
+	mux.HandleFunc("GET /cafes/{id}/edit", handleEditCafe(templates, db))
+	mux.HandleFunc("PUT /cafes/{id}", handleUpdateCafe(db))
+	mux.HandleFunc("DELETE /cafes/{id}", handleDeleteCafe(db))
 
 	log.Fatal(http.ListenAndServe(":8080", methodOverrideMiddleware(mux)))
 }
