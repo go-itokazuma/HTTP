@@ -1,0 +1,11 @@
+{{define "List"}}
+	<html><body>
+		<h1>カフェリスト:</h1>
+		<p><a href="/cafes/new">店舗を追加する</a></p>
+		<ul>
+		{{range .}}
+			<li><a href="/cafes/{{.ID}}">{{.ID}}: {{.Name}}</a></li>
+		{{end}}
+		</ul>
+	</body></html>
+{{end}}

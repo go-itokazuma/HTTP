@@ -1,12 +1,10 @@
-package main
+package PostgreSQLmain
 
 import (
 	"fmt"
 	"log"
 
 	"database/sql"
-	"fmt"
-	"log"
 
 	_ "github.com/lib/pq"
 )
@@ -18,7 +16,7 @@ type Cafe struct {
 
 var Db *sql.DB
 
-func main() {
+func PostgreSQLmain() {
 	dsn := "user=kazuma.ito dbname=cafe sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {

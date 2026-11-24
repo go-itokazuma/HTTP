@@ -1,0 +1,12 @@
+{{define "New"}}
+		<html><body>
+			<h1>新しいカフェを追加</h1>
+			<form action="/cafes" method="post">
+				<p>店舗名: <input type="text" name="name"></p>
+				<p>住所: <input type="text" name="address"></p>
+				<p>営業時間: <input type="text" name="open"></p>
+				<p><input type="submit" value="追加"></p>
+			</form>
+			<p><a href="/cafes">一覧に戻る</a></p>
+		</body></html>
+{{end}}

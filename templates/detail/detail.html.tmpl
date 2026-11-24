@@ -1,0 +1,9 @@
+{{define "Detail"}}
+	<html><body>
+		{{.ID}}: {{.Name}}<br>
+		{{.Address}}<br>
+		{{.Open}}
+		<p><a href="/cafes/{{.ID}}/edit">編集</a></p>
+		<p><a href="/cafes">一覧に戻る</a></p>
+	</body></html>
+{{end}}
